@@ -3,13 +3,13 @@ qol_draw_hex_color(Application_Links *app, View_ID view, Buffer_ID buffer, Text_
 	Scratch_Block scratch(app);
 	Range_i64 visible_range = text_layout_get_visible_range(app, text_layout_id);
 	String_Const_u8 buffer_string = push_buffer_range(app, scratch, buffer, visible_range);
-
-	for (i64 i = 0; i+9 < range_size(visible_range); i += 1){
+    
+    for (i64 i = 0; i+9 < range_size(visible_range); i += 1){
 		u8 *str = buffer_string.str+i;
 		bool s0 = str[0] != '0';
 		bool s1 = str[1] != 'x';
 		if (s0 || s1){ continue; }
-
+        
 		b32 all_hex = true;
 		for (i64 j = 0; j < 8; j += 1){
 			u8 c = str[j+2];
@@ -19,16 +19,16 @@ qol_draw_hex_color(Application_Links *app, View_ID view, Buffer_ID buffer, Text_
 			if (!(is_digit || is_lower || is_upper)) { all_hex=false; break; }
 		}
 		if (!all_hex){ continue; }
-
+        
 		i64 pos = visible_range.min + i;
 		Rect_f32 r0 = text_layout_character_on_screen(app, text_layout_id, pos+0);
 		Rect_f32 r1 = text_layout_character_on_screen(app, text_layout_id, pos+9);
 		Rect_f32 rect = rect_inner(rect_union(r0, r1), -1.f);
-
+        
 		ARGB_Color color = ARGB_Color(string_to_integer(SCu8(str+2, 8), 16));
 		u32 sum = ((color >> 16) & 0xFF) + ((color >> 8) & 0xFF) + (color & 0xFF);
 		ARGB_Color contrast = ARGB_Color(0xFF000000 | (i32(sum > 330)-1));
-
+        
 		draw_rectangle_outline(app, rect_inner(rect, -2.f), 10.f, 4.f, contrast);
 		draw_rectangle(app, rect, 8.f, color);
 		paint_text_color(app, text_layout_id, Ii64_size(pos, 10), contrast);
@@ -43,23 +43,23 @@ qol_draw_scopes(Application_Links *app, View_ID view, Buffer_ID buffer, Text_Lay
 	Rect_f32 prev_clip = draw_set_clip(app, Rect_f32{});
 	Rect_f32 view_rect = prev_clip;
 	view_rect.x0 -= 3.f;
-
+    
 	Range_i64_Array ranges = get_enclosure_ranges(app, scratch, buffer, pos, FindNest_Scope);
 	for (i64 i = 0; i < ranges.count; i += 1){
 		FColor color = fcolor_id(i == 0 ? defcolor_preproc : defcolor_ghost_character);
 		Range_i64 range = ranges.ranges[i];
 		range.max -= 1;
-
+        
 		u8 c0 = buffer_get_char(app, buffer, range.min);
 		u8 c1 = buffer_get_char(app, buffer, range.max);
 		if ((c0 != '{' && c0 != '(') || (c1 != '}' && c1 != ')')){ continue; }
 		paint_text_color_pos(app, text_layout_id, range.min, color);
 		paint_text_color_pos(app, text_layout_id, range.max, color);
-
+        
 		i64 line0 = get_line_number_from_pos(app, buffer, range.min);
 		i64 line1 = get_line_number_from_pos(app, buffer, range.max);
 		if (line0 == line1){ continue; }
-
+        
 		Rect_f32 scope_rect = qol_get_abs_block_rect(app, view, buffer, text_layout_id, range);
 		scope_rect.p0 -= V2f32(3.f, 4.f);
 		scope_rect.x1 += 10.f;
@@ -68,7 +68,7 @@ qol_draw_scopes(Application_Links *app, View_ID view, Buffer_ID buffer, Text_Lay
 		draw_rectangle_outline_fcolor(app, scope_rect, 5.f, 2.f, color);
 	}
 	draw_set_clip(app, prev_clip);
-
+    
 	Token_Array tokens = get_token_array_from_buffer(app, buffer);
 	Range_i64 visible_range = text_layout_get_visible_range(app, text_layout_id);
 	for (i64 i=0 ; i < ranges.count; i += 1){
@@ -76,17 +76,17 @@ qol_draw_scopes(Application_Links *app, View_ID view, Buffer_ID buffer, Text_Lay
 		i64 line0 = get_line_number_from_pos(app, buffer, range.min);
 		i64 line1 = get_line_number_from_pos(app, buffer, range.max);
 		if (line0 == line1 || range.max >= visible_range.max){ continue; }
-
+        
 		Token *start_token = 0;
 		Token_Iterator_Array it = token_iterator_pos(0, &tokens, range.min-1);
 		i64 paren_level = 0;
 		for (;;){
 			Token *token = token_it_read(&it);
 			if (token == 0){ break; }
-
+            
 			paren_level += (token->kind == TokenBaseKind_ParentheticalClose);
 			paren_level -= (token->kind == TokenBaseKind_ParentheticalOpen);
-
+            
 			if (paren_level == 0){
 				if (token->kind == TokenBaseKind_ScopeClose ||
 					(token->kind == TokenBaseKind_StatementClose && token->sub_kind != TokenCppKind_Colon))
@@ -104,11 +104,11 @@ qol_draw_scopes(Application_Links *app, View_ID view, Buffer_ID buffer, Text_Lay
 			}
 			if (!token_it_dec_non_whitespace(&it)){ break; }
 		}
-
+        
 		if (start_token){
 			i64 line = get_line_number_from_pos(app, buffer, start_token->pos);
 			String_Const_u8 text = push_buffer_line(app, scratch, buffer, line);
-
+            
 			i64 ws_count = 0;
 			for (u64 j = 0; j < text.size; j += 1){
 				if (text.str[j] > 32){ break; }
@@ -117,14 +117,68 @@ qol_draw_scopes(Application_Links *app, View_ID view, Buffer_ID buffer, Text_Lay
 			text.str  += ws_count;
 			text.size -= ws_count;
 			text.size -= (text.str[text.size-1] == '\r');
-
+            
 			i64 end_pos = get_line_end_pos(app, buffer, line1)-1;
 			Rect_f32 end_rect = text_layout_character_on_screen(app, text_layout_id, end_pos);
 			Vec2_f32 p0 = V2f32(end_rect.x1 + 3.f, end_rect.y0 + 3.f);
-
+            
 			draw_string(app, qol_small_face, text, p0, fcolor_id(defcolor_ghost_character));
 		}
 	}
+}
+
+function void
+jp_draw_cursor_mark(Application_Links *app, View_ID view_id, b32 is_active_view,
+                    Buffer_ID buffer, Text_Layout_ID text_layout_id,
+                    f32 roundness, f32 outline_thickness)
+{
+    b32 has_highlight_range = draw_highlight_range(app, view_id, buffer, text_layout_id, roundness);
+    
+    i64 cursor_pos = view_get_cursor_pos(app, view_id);
+    i64 mark_pos = view_get_mark_pos(app, view_id);
+    
+    Rect_f32 mark_rect = text_layout_character_on_screen(app, text_layout_id, mark_pos);
+    Rect_f32 nxt_cursor_rect = text_layout_character_on_screen(app, text_layout_id, cursor_pos);
+    if (is_active_view && nxt_cursor_rect.x1 > 0.f){
+        qol_nxt_cursor_pos = nxt_cursor_rect.p0;
+    }
+    b32 cursor_is_open = cursor_pos <= mark_pos;
+    
+    Rect_f32 cur_cursor_rect = Rf32_xy_wh(qol_cur_cursor_pos, rect_dim(nxt_cursor_rect));
+    if (!has_highlight_range){
+        i32 cursor_sub_id = default_cursor_sub_id();
+        b32 cur_overlaps_nxt = rect_overlap(cur_cursor_rect, nxt_cursor_rect);
+        
+        FColor cursor_color = fcolor_id(defcolor_cursor, cursor_sub_id);
+        FColor mark_color = fcolor_id(defcolor_mark);
+        if (!cur_overlaps_nxt) {
+            // Draw the target cursor
+            Rect_f32_Pair pair = rect_split_left_right(nxt_cursor_rect, outline_thickness);
+            draw_rectangle_fcolor(app, pair.a, roundness, fcolor_change_alpha(cursor_color, 0.5f));
+        }
+        
+        Rect_f32 i_part = rect_split_left_right(mark_rect, outline_thickness).a;
+        draw_rectangle_fcolor(app, i_part, roundness, mark_color);
+        // Draw the mark. here the mark is the start of range
+        if (!cursor_is_open){
+            Rect_f32 horiz_part = rect_split_top_bottom(mark_rect, outline_thickness).a;
+            draw_rectangle_fcolor(app, horiz_part, roundness, mark_color);
+        }else{
+            Vec2_f32 dims = rect_dim(mark_rect); 
+            Rect_f32 horiz_part = rect_split_top_bottom(mark_rect, dims.y - outline_thickness).b;
+            f32 width = rect_width(horiz_part);
+            horiz_part.x0 -= width;
+            horiz_part.x1 -= width;
+            draw_rectangle_fcolor(app, horiz_part, roundness, mark_color);
+        }
+        
+        // Draw the cursor I-Bar
+        Rect_f32_Pair pair = rect_split_left_right(cur_cursor_rect, outline_thickness * 1.5f);
+        draw_rectangle_fcolor(app, pair.a, roundness,  cursor_color);
+    }
+    
+    // TODO(jack): MC's assume rectange and outline cursor/mark.
+    MC_render_cursors(app, view_id, text_layout_id);
 }
 
 function void
@@ -132,7 +186,7 @@ qol_draw_cursor_mark(Application_Links *app, View_ID view_id, b32 is_active_view
 					 Buffer_ID buffer, Text_Layout_ID text_layout_id,
 					 f32 roundness, f32 outline_thickness){
 	b32 has_highlight_range = draw_highlight_range(app, view_id, buffer, text_layout_id, roundness);
-
+    
 	i64 cursor_pos = view_get_cursor_pos(app, view_id);
 	i64 mark_pos = view_get_mark_pos(app, view_id);
 	Rect_f32 nxt_cursor_rect = text_layout_character_on_screen(app, text_layout_id, cursor_pos);
@@ -140,7 +194,7 @@ qol_draw_cursor_mark(Application_Links *app, View_ID view_id, b32 is_active_view
 	if (is_active_view && nxt_cursor_rect.x1 > 0.f){
 		qol_nxt_cursor_pos = nxt_cursor_rect.p0;
 	}
-
+    
 	if (!has_highlight_range){
 		ARGB_Color cl_cursor = fcolor_resolve(fcolor_id(defcolor_cursor, default_cursor_sub_id()));
 		if (is_active_view && rect_overlap(nxt_cursor_rect, cur_cursor_rect)){
@@ -153,7 +207,7 @@ qol_draw_cursor_mark(Application_Links *app, View_ID view_id, b32 is_active_view
 		draw_character_wire_frame(app, text_layout_id, mark_pos, roundness, outline_thickness, fcolor_id(defcolor_mark));
 		draw_rectangle(app, cur_cursor_rect, roundness, cl_cursor);
 	}
-
+    
 	MC_render_cursors(app, view_id, text_layout_id);
 }
 
@@ -170,7 +224,7 @@ qol_draw_comments(Application_Links *app, Buffer_ID buffer, Text_Layout_ID text_
 		if (token->pos >= visible_range.one_past_last){ break; }
 		String_Const_u8 tail = {};
 		if (token_it_check_and_get_lexeme(app, scratch, &it, TokenBaseKind_Comment, &tail)){
-
+            
 			//- divider comments
 			String_Const_u8 match = string_u8_litexpr("//-");
 			String_Const_u8 prefix = string_prefix(tail, match.size);
@@ -179,7 +233,7 @@ qol_draw_comments(Application_Links *app, Buffer_ID buffer, Text_Layout_ID text_
 				Rect_f32 dividor_line = Rf32(rect.x0, y - 1.f, rect.x1, y);
 				draw_rectangle_fcolor(app, dividor_line, 0.f, fcolor_id(defcolor_comment));
 			}
-
+            
 			// paint @annotations in comments
 			if (use_comment_annotations_highlight){
                 for (i64 i = 1; i < token->size; i += 1){
@@ -192,7 +246,7 @@ qol_draw_comments(Application_Links *app, Buffer_ID buffer, Text_Layout_ID text_
                         }
                         range.max++;
                     }
-
+                    
                     if (range_size(range) > 1){
                         paint_text_color(app, text_layout_id, range + token->pos, 0xFFFF0000);
                     }
@@ -207,10 +261,10 @@ function void
 qol_draw_function_tooltip_inner(Application_Links *app, Arena *arena, Buffer_ID buffer, Code_Index_Note *note, Range_f32 x_range, i64 depth, Range_i64 range){
 	Range_i64 def_range = note->pos;
 	find_nest_side(app, note->file->buffer, def_range.end+1, FindNest_Paren|FindNest_Balanced|FindNest_EndOfToken, Scan_Forward, NestDelim_Close, &def_range.end);
-
+    
 	String_Const_u8 sig = push_buffer_range(app, arena, note->file->buffer, def_range);
 	sig = string_condense_whitespace(arena, sig);
-
+    
 	Face_Metrics metrics = get_face_metrics(app, qol_small_face);
 	f32 wid = 2.f;
 	f32 pad = 2.f;
@@ -234,7 +288,7 @@ qol_draw_function_tooltip(Application_Links *app, Buffer_ID buffer, Range_f32 x_
 	if (tokens.tokens == 0){ return; }
 	Token_Iterator_Array it = token_iterator_pos(0, &tokens, pos);
 	Token *token = token_it_read(&it);
-
+    
 	if (token->kind == TokenBaseKind_ParentheticalOpen){
 		pos = token->pos + token->size;
 	} else if (token_it_dec_all(&it)){
@@ -243,11 +297,11 @@ qol_draw_function_tooltip(Application_Links *app, Buffer_ID buffer, Range_f32 x_
 			pos = token->pos;
 		}
 	}
-
+    
 	i64 count = 0;
 	Scratch_Block scratch(app);
 	Range_i64_Array ranges = get_enclosure_ranges(app, scratch, buffer, pos, FindNest_Paren);
-
+    
 	code_index_lock();
 	for (i64 i=0; i < ranges.count; i += 1){
 		Scratch_Block temp(app, scratch);
@@ -255,7 +309,7 @@ qol_draw_function_tooltip(Application_Links *app, Buffer_ID buffer, Range_f32 x_
 		i64 f_pos = range.min-1;
 		Token_Iterator_Array cur_it = token_iterator_pos(0, &tokens, f_pos);
 		token = token_it_read(&cur_it);
-
+        
 		if (token->kind == TokenBaseKind_Identifier){
 			String_Const_u8 lexeme = push_token_lexeme(app, temp, buffer, token);
 			Code_Index_Note *note = code_index_note_from_string(lexeme);
@@ -273,17 +327,17 @@ qol_draw_function_tooltip(Application_Links *app, Buffer_ID buffer, Range_f32 x_
 function void
 qol_draw_compile_errors(Application_Links *app, Buffer_ID buffer, Text_Layout_ID text_layout_id, Buffer_ID jump_buffer){
 	if (jump_buffer == 0){ return; }
-
+    
 	Scratch_Block scratch(app);
 	Range_i64 visible_range = text_layout_get_visible_range(app, text_layout_id);
 	FColor cl_error = fcolor_blend(fcolor_id(defcolor_highlight_junk), 0.6f, fcolor_id(defcolor_text_default));
-
+    
 	Managed_Scope scopes[2];
 	scopes[0] = buffer_get_managed_scope(app, jump_buffer);
 	scopes[1] = buffer_get_managed_scope(app, buffer);
 	Managed_Scope comp_scope = get_managed_scope_with_multiple_dependencies(app, scopes, ArrayCount(scopes));
 	Managed_Object *markers_object = scope_attachment(app, comp_scope, sticky_jump_marker_handle, Managed_Object);
-
+    
 	i32 count = managed_object_get_item_count(app, *markers_object);
 	Marker *markers = push_array(scratch, Marker, count);
 	managed_object_load_data(app, *markers_object, 0, count, markers);
@@ -291,11 +345,11 @@ qol_draw_compile_errors(Application_Links *app, Buffer_ID buffer, Text_Layout_ID
 		i64 line_number = get_line_number_from_pos(app, buffer, markers[i].pos);
 		Range_i64 line_range = get_line_pos_range(app, buffer, line_number);
 		if (!range_overlap(visible_range, line_range)){ continue; }
-
+        
 		String_Const_u8 comp_line_string = push_buffer_line(app, scratch, jump_buffer, markers[i].line);
 		Parsed_Jump jump = parse_jump_location(comp_line_string);
 		if (!jump.success){ continue; }
-
+        
 		i64 end_pos = get_line_end_pos(app, buffer, line_number)-1;
 		Rect_f32 end_rect = text_layout_character_on_screen(app, text_layout_id, end_pos);
 		Vec2_f32 p0 = V2f32(end_rect.x1, end_rect.y0 + 4.f);
@@ -309,17 +363,17 @@ function Rect_f32
 qol_draw_query_bars(Application_Links *app, Rect_f32 region, View_ID view_id, Face_ID face_id){
 	Face_Metrics face_metrics = get_face_metrics(app, face_id);
 	f32 line_height = face_metrics.line_height;
-
+    
 	Query_Bar *space[32];
 	Query_Bar_Ptr_Array query_bars = {};
 	query_bars.ptrs = space;
 	if (get_active_query_bars(app, view_id, ArrayCount(space), &query_bars)){
 		for (i32 i = 0; i < query_bars.count; i += 1){
 			Rect_f32_Pair pair = layout_query_bar_on_bot(region, line_height, 1);
-
+            
 			Query_Bar *query_bar = query_bars.ptrs[i];
 			Rect_f32 bar_rect = pair.max;
-
+            
 			Scratch_Block scratch(app);
 			Fancy_Line list = {};
 			push_fancy_string(scratch, &list, fcolor_id(defcolor_pop1),         query_bar->prompt);
@@ -329,7 +383,7 @@ qol_draw_query_bars(Application_Links *app, Rect_f32 region, View_ID view_id, Fa
 			if (i == 0){
 				draw_rectangle_fcolor(app, Rf32_xy_wh(p.x, p.y, 2.f, face_metrics.line_height), 0.f, fcolor_id(defcolor_cursor, 0));
 			}
-
+            
 			region = pair.min;
 		}
 	}
@@ -339,24 +393,24 @@ qol_draw_query_bars(Application_Links *app, Rect_f32 region, View_ID view_id, Fa
 function void
 qol_render_buffer(Application_Links *app, View_ID view_id, Face_ID face_id, Buffer_ID buffer, Text_Layout_ID text_layout_id, Rect_f32 rect){
 	ProfileScope(app, "qol render buffer");
-
+    
 	View_ID active_view = get_active_view(app, Access_Always);
 	b32 is_active_view = (active_view == view_id);
 	Rect_f32 prev_clip = draw_set_clip(app, rect);
-
+    
 	Range_i64 visible_range = text_layout_get_visible_range(app, text_layout_id);
-
+    
 	// NOTE(allen): Cursor shape
 	Face_Metrics metrics = get_face_metrics(app, face_id);
 	u64 cursor_roundness_100 = def_get_config_u64(app, vars_save_string_lit("cursor_roundness"));
 	f32 cursor_roundness = metrics.normal_advance*cursor_roundness_100*0.01f;
 	f32 mark_thickness = (f32)def_get_config_u64(app, vars_save_string_lit("mark_thickness"));
-
+    
 	// NOTE(allen): Token colorizing
 	Token_Array token_array = get_token_array_from_buffer(app, buffer);
 	if (token_array.tokens != 0){
 		qol_draw_cpp_token_colors(app, view_id, buffer, text_layout_id, &token_array);
-
+        
 		// NOTE(allen): Scan for TODOs and NOTEs
 		b32 use_comment_keyword = def_get_config_b32(vars_save_string_lit("use_comment_keyword"));
 		if (use_comment_keyword){
@@ -371,17 +425,17 @@ qol_render_buffer(Application_Links *app, View_ID view_id, Face_ID face_id, Buff
 	else{
 		paint_text_color_fcolor(app, text_layout_id, visible_range, fcolor_id(defcolor_text_default));
 	}
-
+    
 	i64 cursor_pos = view_correct_cursor(app, view_id);
 	view_correct_mark(app, view_id);
-
+    
 	// NOTE(allen): Scope highlight
 	b32 use_scope_highlight = def_get_config_b32(vars_save_string_lit("use_scope_highlight"));
 	if (use_scope_highlight){
 		Color_Array colors = finalize_color_array(defcolor_back_cycle);
 		draw_scope_highlight(app, buffer, text_layout_id, cursor_pos, colors.vals, colors.count);
 	}
-
+    
 	if (qol_col_cursor.pos >= 0){
 		Buffer_Seek seek = seek_line_col(qol_col_cursor.line, qol_col_cursor.col);
 		Buffer_Cursor cursor = buffer_compute_cursor(app, buffer, seek);
@@ -392,16 +446,16 @@ qol_render_buffer(Application_Links *app, View_ID view_id, Face_ID face_id, Buff
 			draw_rectangle_fcolor(app, col_rect, 0.f, fcolor_id(defcolor_highlight_cursor_line));
 		}
 	}
-
+    
 	// NOTE(allen): Line highlight
 	b32 highlight_line_at_cursor = def_get_config_b32(vars_save_string_lit("highlight_line_at_cursor"));
 	if (highlight_line_at_cursor && is_active_view){
 		i64 line_number = get_line_number_from_pos(app, buffer, cursor_pos);
 		draw_line_highlight(app, text_layout_id, line_number, fcolor_id(defcolor_highlight_cursor_line));
 	}
-
+    
 	qol_draw_scopes(app, view_id, buffer, text_layout_id, metrics.normal_advance);
-
+    
 	b32 use_error_highlight = def_get_config_b32(vars_save_string_lit("use_error_highlight"));
 	b32 use_jump_highlight = def_get_config_b32(vars_save_string_lit("use_jump_highlight"));
 	if (use_error_highlight || use_jump_highlight){
@@ -411,7 +465,7 @@ qol_render_buffer(Application_Links *app, View_ID view_id, Face_ID face_id, Buff
 		if (use_error_highlight){
 			qol_draw_compile_errors(app, buffer, text_layout_id, compilation_buffer);
 		}
-
+        
 		// NOTE(allen): Search highlight
 		if (use_jump_highlight){
 			Buffer_ID jump_buffer = get_locked_jump_buffer(app);
@@ -421,14 +475,14 @@ qol_render_buffer(Application_Links *app, View_ID view_id, Face_ID face_id, Buff
 			}
 		}
 	}
-
+    
 	// NOTE(allen): Color parens
 	b32 use_paren_helper = def_get_config_b32(vars_save_string_lit("use_paren_helper"));
 	if (use_paren_helper){
 		Color_Array colors = finalize_color_array(defcolor_text_cycle);
 		draw_paren_highlight(app, buffer, text_layout_id, cursor_pos, colors.vals, colors.count);
 	}
-
+    
 	// NOTE(allen): Whitespace highlight
 	b64 show_whitespace = false;
 	view_get_setting(app, view_id, ViewSetting_ShowWhitespace, &show_whitespace);
@@ -440,34 +494,34 @@ qol_render_buffer(Application_Links *app, View_ID view_id, Face_ID face_id, Buff
 			draw_whitespace_highlight(app, text_layout_id, &token_array, cursor_roundness);
 		}
 	}
-
+    
 	b32 show_hex_colors = def_get_config_b32(vars_save_string_lit("show_hex_colors"));
 	if (show_hex_colors){
 		qol_draw_hex_color(app, view_id, buffer, text_layout_id);
 	}
-
+    
 	// NOTE(allen): Cursor
 	switch (fcoder_mode){
 		case FCoderMode_Original:
 		{
-			qol_draw_cursor_mark(app, view_id, is_active_view, buffer, text_layout_id, cursor_roundness, mark_thickness);
+			jp_draw_cursor_mark(app, view_id, is_active_view, buffer, text_layout_id, cursor_roundness, mark_thickness);
 		}break;
 		case FCoderMode_NotepadLike:
 		{
 			draw_notepad_style_cursor_highlight(app, view_id, buffer, text_layout_id, cursor_roundness);
 		}break;
 	}
-
+    
 	// NOTE(allen): Fade ranges
 	paint_fade_ranges(app, text_layout_id, buffer);
-
+    
 	// NOTE(allen): put the actual text on the actual screen
 	draw_text_layout_default(app, text_layout_id);
-
+    
 	if (rect_contains_point(rect, qol_cur_cursor_pos)){
 		qol_draw_function_tooltip(app, buffer, If32(rect.x0, rect.x1), cursor_pos);
 	}
-
+    
 	draw_set_clip(app, prev_clip);
 }
 
@@ -476,20 +530,20 @@ qol_render_caller(Application_Links *app, Frame_Info frame_info, View_ID view_id
 	ProfileScope(app, "qol render caller");
 	View_ID active_view = get_active_view(app, Access_Always);
 	b32 is_active_view = (active_view == view_id);
-
+    
 	Rect_f32 region = draw_background_and_margin(app, view_id, is_active_view);
 	Rect_f32 prev_clip = draw_set_clip(app, region);
-
+    
 	Buffer_ID buffer = view_get_buffer(app, view_id, Access_Always);
 	Face_ID face_id = get_face_id(app, buffer);
 	Face_Metrics face_metrics = get_face_metrics(app, face_id);
 	f32 line_height = face_metrics.line_height;
 	f32 normal_advance = face_metrics.normal_advance;
 	f32 digit_advance = face_metrics.decimal_digit_advance;
-
+    
 	// NOTE(allen): query bars
 	region = qol_draw_query_bars(app, region, view_id, face_id);
-
+    
 	// NOTE(allen): file bar
 	b64 showing_file_bar = false;
 	if (view_get_setting(app, view_id, ViewSetting_ShowFileBar, &showing_file_bar) && showing_file_bar){
@@ -500,14 +554,9 @@ qol_render_caller(Application_Links *app, Frame_Info frame_info, View_ID view_id
 		draw_file_bar(app, view_id, buffer, face_id, pair.e[1-on_top]);
         region = pair.e[on_top];
     }
-
-	f32 char_count = def_get_config_f32(app, vars_save_string_lit("scroll_margin_x"));
-	f32 line_count = def_get_config_f32(app, vars_save_string_lit("scroll_margin_y"));
-	Vec2_f32 margin = V2f32(char_count*normal_advance, line_count*line_height);
-	view_set_camera_bounds(app, view_id, margin, V2f32(1,1));
-
+    
 	Buffer_Scroll scroll = view_get_buffer_scroll(app, view_id);
-
+    
 	Buffer_Point_Delta_Result delta = delta_apply(app, view_id, frame_info.animation_dt, scroll);
 	if (!block_match_struct(&scroll.position, &delta.point)){
 		block_copy_struct(&scroll.position, &delta.point);
@@ -516,7 +565,7 @@ qol_render_caller(Application_Links *app, Frame_Info frame_info, View_ID view_id
 	if (delta.still_animating){
 		animate_in_n_milliseconds(app, 0);
 	}
-
+    
 	// NOTE(allen): FPS hud
 	if (show_fps_hud){
 		Rect_f32_Pair pair = layout_fps_hud_on_bottom(region, line_height);
@@ -524,7 +573,7 @@ qol_render_caller(Application_Links *app, Frame_Info frame_info, View_ID view_id
 		region = pair.min;
 		animate_in_n_milliseconds(app, 1000);
 	}
-
+    
 	// NOTE(allen): layout line numbers
 	b32 show_line_number_margins = def_get_config_b32(vars_save_string_lit("show_line_number_margins"));
 	Rect_f32 line_number_rect = {};
@@ -534,19 +583,19 @@ qol_render_caller(Application_Links *app, Frame_Info frame_info, View_ID view_id
 		region = pair.max;
 	}
 	region = rect_split_left_right(region, 4.f).max;
-
+    
 	// NOTE(allen): begin buffer render
 	Buffer_Point buffer_point = scroll.position;
 	Text_Layout_ID text_layout_id = text_layout_create(app, buffer, region, buffer_point);
-
+    
 	// NOTE(allen): draw line numbers
 	if (show_line_number_margins){
 		draw_line_number_margin(app, view_id, buffer, face_id, text_layout_id, line_number_rect);
 	}
-
+    
 	// NOTE(allen): draw the buffer
 	qol_render_buffer(app, view_id, face_id, buffer, text_layout_id, region);
-
+    
 	text_layout_free(app, text_layout_id);
 	draw_set_clip(app, prev_clip);
 }
@@ -558,10 +607,10 @@ qol_buffer_region(Application_Links *app, View_ID view_id, Rect_f32 region){
 	Face_Metrics metrics = get_face_metrics(app, face_id);
 	f32 line_height = metrics.line_height;
 	f32 digit_advance = metrics.decimal_digit_advance;
-
+    
 	// NOTE(allen): margins
 	region = rect_inner(region, 3.f);
-
+    
 	// NOTE(allen): file bar
 	b64 showing_file_bar = false;
 	if (view_get_setting(app, view_id, ViewSetting_ShowFileBar, &showing_file_bar) &&
@@ -572,7 +621,7 @@ qol_buffer_region(Application_Links *app, View_ID view_id, Rect_f32 region){
                               layout_file_bar_on_bot(region, line_height));
 		region = pair.e[on_top];
 	}
-
+    
 	// NOTE(allen): query bars
 	{
 		Query_Bar *space[32];
@@ -583,13 +632,13 @@ qol_buffer_region(Application_Links *app, View_ID view_id, Rect_f32 region){
 			region = pair.max;
 		}
 	}
-
+    
 	// NOTE(allen): FPS hud
 	if (show_fps_hud){
 		Rect_f32_Pair pair = layout_fps_hud_on_bottom(region, line_height);
 		region = pair.min;
 	}
-
+    
 	// NOTE(allen): line numbers
 	b32 show_line_number_margins = def_get_config_b32(vars_save_string_lit("show_line_number_margins"));
 	if (show_line_number_margins){
@@ -597,6 +646,6 @@ qol_buffer_region(Application_Links *app, View_ID view_id, Rect_f32 region){
 		region = pair.max;
 	}
 	region = rect_split_left_right(region, 4.f).max;
-
+    
 	return(region);
 }
